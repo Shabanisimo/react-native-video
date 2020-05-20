@@ -1614,6 +1614,7 @@ static int const RCTVideoUnset = -1;
 }
 
 - (void)setLicenseResult:(NSString *)license {
+  _requestingCertificate = NO;
   NSData *respondData = [self base64DataFromBase64String:license];
   if (_loadingRequest != nil && respondData != nil) {
     AVAssetResourceLoadingDataRequest *dataRequest = [_loadingRequest dataRequest];
@@ -1625,6 +1626,7 @@ static int const RCTVideoUnset = -1;
 }
 
 - (BOOL)setLicenseResultError:(NSString *)error {
+  _requestingCertificate = NO;
   if (_loadingRequest != nil) {
     NSError *licenseError = [NSError errorWithDomain: @"RCTVideo"
                                                 code: RCTVideoErrorFromJSPart
