@@ -1704,7 +1704,8 @@ didCancelLoadingRequest:(AVAssetResourceLoadingRequest *)loadingRequest {
   }
   _loadingRequest = loadingRequest;
   NSURL *url = loadingRequest.request.URL;
-  NSString *contentId = url.host;
+  NSString *urlString = url.absoluteString;
+  NSString *contentId = [urlString stringByReplacingOccurrencesOfString:@"skd://" withString:@""];
   if (self->_drm != nil) {
     NSString *contentIdOverride = (NSString *)[self->_drm objectForKey:@"contentId"];
     if (contentIdOverride != nil) {
