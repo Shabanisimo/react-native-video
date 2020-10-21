@@ -380,7 +380,7 @@ class ReactExoplayerView extends FrameLayout implements
                             int errorStringId = Util.SDK_INT < 18 ? R.string.error_drm_not_supported
                                     : (e.reason == UnsupportedDrmException.REASON_UNSUPPORTED_SCHEME
                                     ? R.string.error_drm_unsupported_scheme : R.string.error_drm_unknown);
-                            eventEmitter.error(getResources().getString(errorStringId), e);
+                            eventEmitter.error(getResources().getString(errorStringId), e, "ERR_DRM_SCHEME");
                             return;
                         }
                     }
@@ -893,7 +893,7 @@ class ReactExoplayerView extends FrameLayout implements
             errorString = getResources().getString(R.string.unrecognized_media_format);
         }
         if (errorString != null) {
-            eventEmitter.error(errorString, ex);
+            eventEmitter.error(errorString, ex, "ERR_PLAYER");
         }
         playerNeedsSource = true;
         if (isBehindLiveWindow(e)) {
@@ -1277,7 +1277,7 @@ class ReactExoplayerView extends FrameLayout implements
     @Override
     public void onDrmSessionManagerError(Exception e) {
         Log.d("DRM Info", "onDrmSessionManagerError");
-        eventEmitter.error("onDrmSessionManagerError", e);
+        eventEmitter.error("onDrmSessionManagerError", e, "ERR_DRM_LICENSE");
     }
 
     @Override
