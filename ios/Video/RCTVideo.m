@@ -682,7 +682,8 @@ static int const RCTVideoUnset = -1;
         [self attachListeners];
         [self applyModifiers];
       } else if (_playerItem.status == AVPlayerItemStatusFailed && self.onVideoError) {
-        self.onVideoError(@{@"error": @{@"code": [NSNumber numberWithInteger: _playerItem.error.code],
+        self.onVideoError(@{@"error": @{@"err_code": @"ERR_PLAYER",
+                                        @"code": [NSNumber numberWithInteger: _playerItem.error.code],
                                         @"localizedDescription": [_playerItem.error localizedDescription] == nil ? @"" : [_playerItem.error localizedDescription],
                                         @"localizedFailureReason": [_playerItem.error localizedFailureReason] == nil ? @"" : [_playerItem.error localizedFailureReason],
                                         @"localizedRecoverySuggestion": [_playerItem.error localizedRecoverySuggestion] == nil ? @"" : [_playerItem.error localizedRecoverySuggestion],
@@ -790,7 +791,8 @@ static int const RCTVideoUnset = -1;
 
 - (void)didFailToFinishPlaying:(NSNotification *)notification {
   NSError *error = notification.userInfo[AVPlayerItemFailedToPlayToEndTimeErrorKey];
-  self.onVideoError(@{@"error": @{@"code": [NSNumber numberWithInteger: error.code],
+  self.onVideoError(@{@"error": @{@"err_code": @"ERR_PLAYER",
+                                  @"code": [NSNumber numberWithInteger: error.code],
                                   @"localizedDescription": [error localizedDescription] == nil ? @"" : [error localizedDescription],
                                   @"localizedFailureReason": [error localizedFailureReason] == nil ? @"" : [error localizedFailureReason],
                                   @"localizedRecoverySuggestion": [error localizedRecoverySuggestion] == nil ? @"" : [error localizedRecoverySuggestion],
@@ -1636,17 +1638,18 @@ static int const RCTVideoUnset = -1;
                                                         NSLocalizedRecoverySuggestionErrorKey: error
                                                         }
                              ];
-    [self finishLoadingWithError:licenseError];
+    [self finishLoadingWithError:licenseError errCode:@"ERR_DRM_LICENSE"];
   }
   return NO;
 }
 
-- (BOOL)finishLoadingWithError:(NSError *)error {
+- (BOOL)finishLoadingWithError:(NSError *)error errCode:(NSString*)errCode {
   if (_loadingRequest && error != nil) {
     NSError *licenseError = error;
     [_loadingRequest finishLoadingWithError:licenseError];
     if (self.onVideoError) {
-      self.onVideoError(@{@"error": @{@"code": [NSNumber numberWithInteger: error.code],
+      self.onVideoError(@{@"error": @{@"err_code": errCode,
+                                      @"code": [NSNumber numberWithInteger: error.code],
                                       @"localizedDescription": [error localizedDescription] == nil ? @"" : [error localizedDescription],
                                       @"localizedFailureReason": [error localizedFailureReason] == nil ? @"" : [error localizedFailureReason],
                                       @"localizedRecoverySuggestion": [error localizedRecoverySuggestion] == nil ? @"" : [error localizedRecoverySuggestion],
@@ -1731,7 +1734,7 @@ didCancelLoadingRequest:(AVAssetResourceLoadingRequest *)loadingRequest {
               // Request CKC to the server
               NSString *licenseServer = (NSString *)[self->_drm objectForKey:@"licenseServer"];
               if (spcError != nil) {
-                [self finishLoadingWithError:spcError];
+                [self finishLoadingWithError:spcError errCode:@"ERR_STREAMING_CONTENT_KEY"];
                 self->_requestingCertificateErrored = YES;
               }
               if (spcData != nil) {
@@ -1760,7 +1763,7 @@ didCancelLoadingRequest:(AVAssetResourceLoadingRequest *)loadingRequest {
                     NSHTTPURLResponse *httpResponse = (NSHTTPURLResponse *) response;
                     if (error != nil) {
                       NSLog(@"Error getting license from %@, HTTP status code %li", url, (long)[httpResponse statusCode]);
-                      [self finishLoadingWithError:error];
+                      [self finishLoadingWithError:error errCode:@"ERR_DRM_LICENSE"];
                       self->_requestingCertificateErrored = YES;
                     } else {
                       if([httpResponse statusCode] != 200){
@@ -1773,7 +1776,7 @@ didCancelLoadingRequest:(AVAssetResourceLoadingRequest *)loadingRequest {
                                                                             NSLocalizedRecoverySuggestionErrorKey: @"Did you send the correct data to the license Server? Is the server ok?"
                                                                             }
                                                  ];
-                        [self finishLoadingWithError:licenseError];
+                        [self finishLoadingWithError:licenseError errCode:@"ERR_DRM_LICENSE"];
                         self->_requestingCertificateErrored = YES;
                       } else if (data != nil) {
                         [dataRequest respondWithData:data];
@@ -1787,7 +1790,7 @@ didCancelLoadingRequest:(AVAssetResourceLoadingRequest *)loadingRequest {
                                                                             NSLocalizedRecoverySuggestionErrorKey: @"Is the licenseServer ok?."
                                                                             }
                                                  ];
-                        [self finishLoadingWithError:licenseError];
+                        [self finishLoadingWithError:licenseError errCode:@"ERR_DRM_LICENSE"];
                         self->_requestingCertificateErrored = YES;
                       }
                       
@@ -1805,7 +1808,7 @@ didCancelLoadingRequest:(AVAssetResourceLoadingRequest *)loadingRequest {
                                                                     NSLocalizedRecoverySuggestionErrorKey: @"Check your DRM config."
                                                                     }
                                          ];
-                [self finishLoadingWithError:licenseError];
+                [self finishLoadingWithError:licenseError errCode:@"ERR_STREAMING_CONTENT_KEY"];
                 self->_requestingCertificateErrored = YES;
               }
               
@@ -1818,7 +1821,7 @@ didCancelLoadingRequest:(AVAssetResourceLoadingRequest *)loadingRequest {
                                                                   NSLocalizedRecoverySuggestionErrorKey: @"Check your DRM configuration."
                                                                   }
                                        ];
-              [self finishLoadingWithError:licenseError];
+              [self finishLoadingWithError:licenseError errCode:@"ERR_DRM_SCHEME"];
               self->_requestingCertificateErrored = YES;
             }
           } else {
@@ -1830,7 +1833,7 @@ didCancelLoadingRequest:(AVAssetResourceLoadingRequest *)loadingRequest {
                                                                 NSLocalizedRecoverySuggestionErrorKey: @"Have you specified a valid 'certificateUrl'?"
                                                                 }
                                      ];
-            [self finishLoadingWithError:licenseError];
+            [self finishLoadingWithError:licenseError errCode:@"ERR_FAIRPLAY_CERTIFICATE"];
             self->_requestingCertificateErrored = YES;
           }
         });
@@ -1844,7 +1847,7 @@ didCancelLoadingRequest:(AVAssetResourceLoadingRequest *)loadingRequest {
                                                             NSLocalizedRecoverySuggestionErrorKey: @"Did you specified the prop certificateUrl?"
                                                             }
                                  ];
-        return [self finishLoadingWithError:licenseError];
+        return [self finishLoadingWithError:licenseError errCode:@"ERR_FAIRPLAY_CERTIFICATE"];
       }
     } else {
       NSError *licenseError = [NSError errorWithDomain: @"RCTVideo"
@@ -1855,7 +1858,7 @@ didCancelLoadingRequest:(AVAssetResourceLoadingRequest *)loadingRequest {
                                                           NSLocalizedRecoverySuggestionErrorKey: @"Have you specified the 'drm' 'type' as fairplay?"
                                                           }
                                ];
-      return [self finishLoadingWithError:licenseError];
+      return [self finishLoadingWithError:licenseError errCode:@"ERR_DRM_SCHEME"];
     }
     
   } else {
@@ -1867,7 +1870,7 @@ didCancelLoadingRequest:(AVAssetResourceLoadingRequest *)loadingRequest {
                                                         NSLocalizedRecoverySuggestionErrorKey: @"Have you specified the 'drm' prop?"
                                                         }
                              ];
-    return [self finishLoadingWithError:licenseError];
+    return [self finishLoadingWithError:licenseError errCode:@"ERR_DRM_SCHEME"];
   }
   
   
