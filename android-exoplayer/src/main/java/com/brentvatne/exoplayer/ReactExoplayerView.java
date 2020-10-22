@@ -380,7 +380,7 @@ class ReactExoplayerView extends FrameLayout implements
                             int errorStringId = Util.SDK_INT < 18 ? R.string.error_drm_not_supported
                                     : (e.reason == UnsupportedDrmException.REASON_UNSUPPORTED_SCHEME
                                     ? R.string.error_drm_unsupported_scheme : R.string.error_drm_unknown);
-                            eventEmitter.error(getResources().getString(errorStringId), e, "ERR_DRM_SCHEME");
+                            eventEmitter.error(getResources().getString(errorStringId), e, getResources().getString(R.string.err_code_drm_scheme));
                             return;
                         }
                     }
@@ -864,11 +864,19 @@ class ReactExoplayerView extends FrameLayout implements
 
     @Override
     public void onPlayerError(ExoPlaybackException e) {
-        String errorString = null;
+        String errorString = getResources().getString(R.string.error_general);
+        String errCode = getResources().getString(R.string.err_code_player);
         Exception ex = e;
         if (e.type == ExoPlaybackException.TYPE_RENDERER) {
             Exception cause = e.getRendererException();
-            if (cause instanceof MediaCodecRenderer.DecoderInitializationException) {
+            if (cause instanceof DrmSession.DrmSessionException) {
+                errorString = getResources().getString(R.string.error_drm_license);
+                errCode = getResources().getString(R.string.err_code_drm_license);
+            } else if (cause instanceof IllegalStateException) {
+                errorString = getResources().getString(R.string.error_drm_unsupported_scheme);
+                errCode = getResources().getString(R.string.err_code_drm_scheme);
+            }
+            else if (cause instanceof MediaCodecRenderer.DecoderInitializationException) {
                 // Special case for decoder initialization failures.
                 MediaCodecRenderer.DecoderInitializationException decoderInitializationException =
                         (MediaCodecRenderer.DecoderInitializationException) cause;
@@ -892,9 +900,9 @@ class ReactExoplayerView extends FrameLayout implements
             ex = e.getSourceException();
             errorString = getResources().getString(R.string.unrecognized_media_format);
         }
-        if (errorString != null) {
-            eventEmitter.error(errorString, ex, "ERR_PLAYER");
-        }
+
+        eventEmitter.error(errorString, ex, errCode);
+
         playerNeedsSource = true;
         if (isBehindLiveWindow(e)) {
             clearResumePosition();
@@ -1277,7 +1285,7 @@ class ReactExoplayerView extends FrameLayout implements
     @Override
     public void onDrmSessionManagerError(Exception e) {
         Log.d("DRM Info", "onDrmSessionManagerError");
-        eventEmitter.error("onDrmSessionManagerError", e, "ERR_DRM_LICENSE");
+        eventEmitter.error("onDrmSessionManagerError", e, getResources().getString(R.string.err_code_drm_license));
     }
 
     @Override
