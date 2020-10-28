@@ -240,13 +240,13 @@ export default class Video extends Component {
           if (result !== null) {
             NativeModules.VideoManager.setLicenseResult(result, data.contentId, findNodeHandle(this._root));
           } else {
-            NativeModules.VideoManager.setLicenseError && NativeModules.VideoManager.setLicenseError('Empty license result', data.contentId, findNodeHandle(this._root));
+            NativeModules.VideoManager.setLicenseResultError('Empty license result', data.contentId, findNodeHandle(this._root));
           }
         })).catch((error) => {
-          NativeModules.VideoManager.setLicenseError && NativeModules.VideoManager.setLicenseError(error, data.contentId, findNodeHandle(this._root));
+          NativeModules.VideoManager.setLicenseResultError('License request failed', data.contentId, findNodeHandle(this._root));
         });
       } else {
-        NativeModules.VideoManager.setLicenseError && NativeModules.VideoManager.setLicenseError("No spc received", data.contentId, findNodeHandle(this._root));
+        NativeModules.VideoManager.setLicenseResultError("No spc received", data.contentId, findNodeHandle(this._root));
       }
     }
   }
