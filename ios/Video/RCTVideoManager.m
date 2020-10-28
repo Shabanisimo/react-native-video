@@ -83,7 +83,8 @@ RCT_REMAP_METHOD(save,
     }];
 };
 RCT_REMAP_METHOD(setLicenseResult,
-         license:(NSString *)license
+                  license:(NSString *)license
+                  contentId:(NSString *)contentId
          reactTag:(nonnull NSNumber *)reactTag)
 {
     [self.bridge.uiManager prependUIBlock:^(__unused RCTUIManager *uiManager, NSDictionary<NSNumber *, RCTVideo *> *viewRegistry) {
@@ -91,13 +92,14 @@ RCT_REMAP_METHOD(setLicenseResult,
         if (![view isKindOfClass:[RCTVideo class]]) {
             RCTLogError(@"Invalid view returned from registry, expecting RCTVideo, got: %@", view);
         } else {
-            [view setLicenseResult:license];
+            [view setLicenseResult:license contentId:contentId];
         }
     }];
 };
 
 RCT_REMAP_METHOD(setLicenseResultError,
-                 error:(NSString *)error
+                  error:(NSString *)error
+                  contentId:(NSString *)contentId
                  reactTag:(nonnull NSNumber *)reactTag)
 {
     [self.bridge.uiManager prependUIBlock:^(__unused RCTUIManager *uiManager, NSDictionary<NSNumber *, RCTVideo *> *viewRegistry) {
@@ -105,7 +107,7 @@ RCT_REMAP_METHOD(setLicenseResultError,
         if (![view isKindOfClass:[RCTVideo class]]) {
             RCTLogError(@"Invalid view returned from registry, expecting RCTVideo, got: %@", view);
         } else {
-            [view setLicenseResultError:error];
+            [view setLicenseResultError:error contentId:contentId];
         }
     }];
 };

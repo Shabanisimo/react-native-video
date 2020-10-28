@@ -33,12 +33,11 @@ static int const RCTVideoUnset = -1;
   BOOL _playerLayerObserverSet;
   RCTVideoPlayerViewController *_playerViewController;
   NSURL *_videoURL;
-  BOOL _requestingCertificate;
   BOOL _requestingCertificateErrored;
   
   /* DRM */
   NSDictionary *_drm;
-  AVAssetResourceLoadingRequest *_loadingRequest;
+  NSMutableArray *_loadingRequests;
   
   /* Required to publish events */
   RCTEventDispatcher *_eventDispatcher;
@@ -93,8 +92,9 @@ static int const RCTVideoUnset = -1;
 - (instancetype)initWithEventDispatcher:(RCTEventDispatcher *)eventDispatcher
 {
   if ((self = [super init])) {
+      _loadingRequests = [[NSMutableArray alloc] init];
     _eventDispatcher = eventDispatcher;
-	  _automaticallyWaitsToMinimizeStalling = YES;
+      _automaticallyWaitsToMinimizeStalling = YES;
     _playbackRateObserverRegistered = NO;
     _isExternalPlaybackActiveObserverRegistered = NO;
     _playbackStalled = NO;
@@ -530,10 +530,12 @@ static int const RCTVideoUnset = -1;
     asset = [AVURLAsset URLAssetWithURL:[[NSURL alloc] initFileURLWithPath:[[NSBundle mainBundle] pathForResource:uri ofType:type]] options:nil];
   }
   // Reset _loadingRequest
-  if (_loadingRequest != nil) {
-    [_loadingRequest finishLoading];
+  if (_loadingRequests.count != 0) {
+      for (AVAssetResourceLoadingRequest *loadingRequest in _loadingRequests) {
+          [loadingRequest finishLoading];
+      }
+      [_loadingRequests removeAllObjects];
   }
-  _requestingCertificate = NO;
   _requestingCertificateErrored = NO;
   // End Reset _loadingRequest
   if (self->_drm != nil) {
@@ -1004,8 +1006,8 @@ static int const RCTVideoUnset = -1;
 
 - (void)setAutomaticallyWaitsToMinimizeStalling:(BOOL)waits
 {
-	_automaticallyWaitsToMinimizeStalling = waits;
-	_player.automaticallyWaitsToMinimizeStalling = waits;
+    _automaticallyWaitsToMinimizeStalling = waits;
+    _player.automaticallyWaitsToMinimizeStalling = waits;
 }
 
 
@@ -1408,10 +1410,12 @@ static int const RCTVideoUnset = -1;
 
 - (void)removePlayerLayer
 {
-  if (_loadingRequest != nil) {
-    [_loadingRequest finishLoading];
-  }
-  _requestingCertificate = NO;
+    if (_loadingRequests.count != 0) {
+        for (AVAssetResourceLoadingRequest *loadingRequest in _loadingRequests) {
+            [loadingRequest finishLoading];
+        }
+        [_loadingRequests removeAllObjects];
+    }
   _requestingCertificateErrored = NO;
   [_playerLayer removeFromSuperlayer];
   if (_playerLayerObserverSet) {
@@ -1615,21 +1619,20 @@ static int const RCTVideoUnset = -1;
   }
 }
 
-- (void)setLicenseResult:(NSString *)license {
-  _requestingCertificate = NO;
-  NSData *respondData = [self base64DataFromBase64String:license];
-  if (_loadingRequest != nil && respondData != nil) {
-    AVAssetResourceLoadingDataRequest *dataRequest = [_loadingRequest dataRequest];
+- (void)setLicenseResult:(NSString *)result contentId:(NSString *)contentId {
+    NSData *respondData = [self base64DataFromBase64String:result];
+    AVAssetResourceLoadingRequest *loadingRequest = [self loadingRequestWithContentId:contentId];
+  if (loadingRequest != nil && respondData != nil) {
+    AVAssetResourceLoadingDataRequest *dataRequest = [loadingRequest dataRequest];
     [dataRequest respondWithData:respondData];
-    [_loadingRequest finishLoading];
+    [loadingRequest finishLoading];
+      [_loadingRequests removeObject:loadingRequest];
   } else {
-    [self setLicenseResultError:@"No data from JS license response"];
+      [self setLicenseResultError:@"No data from JS license response" contentId:contentId];
   }
 }
 
-- (BOOL)setLicenseResultError:(NSString *)error {
-  _requestingCertificate = NO;
-  if (_loadingRequest != nil) {
+- (BOOL)setLicenseResultError:(NSString *)error contentId:(NSString *)contentId{
     NSError *licenseError = [NSError errorWithDomain: @"RCTVideo"
                                                 code: RCTVideoErrorFromJSPart
                                             userInfo: @{
@@ -1638,15 +1641,16 @@ static int const RCTVideoUnset = -1;
                                                         NSLocalizedRecoverySuggestionErrorKey: error
                                                         }
                              ];
-    [self finishLoadingWithError:licenseError errCode:@"ERR_DRM_LICENSE"];
-  }
+    [self finishLoadingWithError:licenseError errCode:@"ERR_DRM_LICENSE" contentId:contentId];
   return NO;
 }
 
-- (BOOL)finishLoadingWithError:(NSError *)error errCode:(NSString*)errCode {
-  if (_loadingRequest && error != nil) {
+- (BOOL)finishLoadingWithError:(NSError *)error errCode:(NSString*)errCode contentId:(NSString *)contentId {
+    AVAssetResourceLoadingRequest *loadingRequest = [self loadingRequestWithContentId:contentId];
+  if (loadingRequest && error != nil) {
     NSError *licenseError = error;
-    [_loadingRequest finishLoadingWithError:licenseError];
+    [loadingRequest finishLoadingWithError:licenseError];
+      [_loadingRequests removeObject:loadingRequest];
     if (self.onVideoError) {
       self.onVideoError(@{@"error": @{@"err_code": errCode,
                                       @"code": [NSNumber numberWithInteger: error.code],
@@ -1700,15 +1704,11 @@ didCancelLoadingRequest:(AVAssetResourceLoadingRequest *)loadingRequest {
 }
 
 - (BOOL)loadingRequestHandling:(AVAssetResourceLoadingRequest *)loadingRequest {
-  if (self->_requestingCertificate) {
-    return YES;
-  } else if (self->_requestingCertificateErrored) {
+  if (self->_requestingCertificateErrored) {
     return NO;
   }
-  _loadingRequest = loadingRequest;
-  NSURL *url = loadingRequest.request.URL;
-  NSString *urlString = url.absoluteString;
-  NSString *contentId = [urlString stringByReplacingOccurrencesOfString:@"skd://" withString:@""];
+  [_loadingRequests addObject:loadingRequest];
+  NSString *contentId = [self contentIdForLoadingRequest:loadingRequest];
   if (self->_drm != nil) {
     NSString *contentIdOverride = (NSString *)[self->_drm objectForKey:@"contentId"];
     if (contentIdOverride != nil) {
@@ -1734,13 +1734,13 @@ didCancelLoadingRequest:(AVAssetResourceLoadingRequest *)loadingRequest {
               // Request CKC to the server
               NSString *licenseServer = (NSString *)[self->_drm objectForKey:@"licenseServer"];
               if (spcError != nil) {
-                [self finishLoadingWithError:spcError errCode:@"ERR_STREAMING_CONTENT_KEY"];
+                [self finishLoadingWithError:spcError errCode:@"ERR_STREAMING_CONTENT_KEY" contentId:contentId];
                 self->_requestingCertificateErrored = YES;
               }
               if (spcData != nil) {
                 if(self.onGetLicense) {
-                  self->_requestingCertificate = YES;
                   self.onGetLicense(@{@"spcBase64": [spcData base64EncodedStringWithOptions:nil],
+                                      @"contentId": contentId,
                                       @"target": self.reactTag});
                 } else if(licenseServer != nil) {
                   NSMutableURLRequest *request = [[NSMutableURLRequest alloc] init];
@@ -1762,12 +1762,12 @@ didCancelLoadingRequest:(AVAssetResourceLoadingRequest *)loadingRequest {
                   NSURLSessionDataTask *postDataTask = [session dataTaskWithRequest:request completionHandler:^(NSData *data, NSURLResponse *response, NSError *error) {
                     NSHTTPURLResponse *httpResponse = (NSHTTPURLResponse *) response;
                     if (error != nil) {
-                      NSLog(@"Error getting license from %@, HTTP status code %li", url, (long)[httpResponse statusCode]);
-                      [self finishLoadingWithError:error errCode:@"ERR_DRM_LICENSE"];
+                      NSLog(@"Error getting license, HTTP status code %li", (long)[httpResponse statusCode]);
+                      [self finishLoadingWithError:error errCode:@"ERR_DRM_LICENSE" contentId:contentId];
                       self->_requestingCertificateErrored = YES;
                     } else {
                       if([httpResponse statusCode] != 200){
-                        NSLog(@"Error getting license from %@, HTTP status code %li", url, (long)[httpResponse statusCode]);
+                        NSLog(@"Error getting license, HTTP status code %li", (long)[httpResponse statusCode]);
                         NSError *licenseError = [NSError errorWithDomain: @"RCTVideo"
                                                                     code: RCTVideoErrorLicenseRequestNotOk
                                                                 userInfo: @{
@@ -1776,11 +1776,12 @@ didCancelLoadingRequest:(AVAssetResourceLoadingRequest *)loadingRequest {
                                                                             NSLocalizedRecoverySuggestionErrorKey: @"Did you send the correct data to the license Server? Is the server ok?"
                                                                             }
                                                  ];
-                        [self finishLoadingWithError:licenseError errCode:@"ERR_DRM_LICENSE"];
+                        [self finishLoadingWithError:licenseError errCode:@"ERR_DRM_LICENSE" contentId:contentId];
                         self->_requestingCertificateErrored = YES;
                       } else if (data != nil) {
                         [dataRequest respondWithData:data];
                         [loadingRequest finishLoading];
+                          [self->_loadingRequests removeObject:loadingRequest];
                       } else {
                         NSError *licenseError = [NSError errorWithDomain: @"RCTVideo"
                                                                     code: RCTVideoErrorNoDataFromLicenseRequest
@@ -1790,7 +1791,7 @@ didCancelLoadingRequest:(AVAssetResourceLoadingRequest *)loadingRequest {
                                                                             NSLocalizedRecoverySuggestionErrorKey: @"Is the licenseServer ok?."
                                                                             }
                                                  ];
-                        [self finishLoadingWithError:licenseError errCode:@"ERR_DRM_LICENSE"];
+                        [self finishLoadingWithError:licenseError errCode:@"ERR_DRM_LICENSE" contentId:contentId];
                         self->_requestingCertificateErrored = YES;
                       }
                       
@@ -1808,7 +1809,7 @@ didCancelLoadingRequest:(AVAssetResourceLoadingRequest *)loadingRequest {
                                                                     NSLocalizedRecoverySuggestionErrorKey: @"Check your DRM config."
                                                                     }
                                          ];
-                [self finishLoadingWithError:licenseError errCode:@"ERR_STREAMING_CONTENT_KEY"];
+                [self finishLoadingWithError:licenseError errCode:@"ERR_STREAMING_CONTENT_KEY" contentId:contentId];
                 self->_requestingCertificateErrored = YES;
               }
               
@@ -1821,7 +1822,7 @@ didCancelLoadingRequest:(AVAssetResourceLoadingRequest *)loadingRequest {
                                                                   NSLocalizedRecoverySuggestionErrorKey: @"Check your DRM configuration."
                                                                   }
                                        ];
-              [self finishLoadingWithError:licenseError errCode:@"ERR_DRM_SCHEME"];
+              [self finishLoadingWithError:licenseError errCode:@"ERR_DRM_SCHEME" contentId:contentId];
               self->_requestingCertificateErrored = YES;
             }
           } else {
@@ -1833,7 +1834,7 @@ didCancelLoadingRequest:(AVAssetResourceLoadingRequest *)loadingRequest {
                                                                 NSLocalizedRecoverySuggestionErrorKey: @"Have you specified a valid 'certificateUrl'?"
                                                                 }
                                      ];
-            [self finishLoadingWithError:licenseError errCode:@"ERR_FAIRPLAY_CERTIFICATE"];
+            [self finishLoadingWithError:licenseError errCode:@"ERR_FAIRPLAY_CERTIFICATE" contentId:contentId];
             self->_requestingCertificateErrored = YES;
           }
         });
@@ -1847,7 +1848,7 @@ didCancelLoadingRequest:(AVAssetResourceLoadingRequest *)loadingRequest {
                                                             NSLocalizedRecoverySuggestionErrorKey: @"Did you specified the prop certificateUrl?"
                                                             }
                                  ];
-        return [self finishLoadingWithError:licenseError errCode:@"ERR_FAIRPLAY_CERTIFICATE"];
+        return [self finishLoadingWithError:licenseError errCode:@"ERR_FAIRPLAY_CERTIFICATE" contentId:contentId];
       }
     } else {
       NSError *licenseError = [NSError errorWithDomain: @"RCTVideo"
@@ -1858,7 +1859,7 @@ didCancelLoadingRequest:(AVAssetResourceLoadingRequest *)loadingRequest {
                                                           NSLocalizedRecoverySuggestionErrorKey: @"Have you specified the 'drm' 'type' as fairplay?"
                                                           }
                                ];
-      return [self finishLoadingWithError:licenseError errCode:@"ERR_DRM_SCHEME"];
+      return [self finishLoadingWithError:licenseError errCode:@"ERR_DRM_SCHEME" contentId:contentId];
     }
     
   } else {
@@ -1870,7 +1871,7 @@ didCancelLoadingRequest:(AVAssetResourceLoadingRequest *)loadingRequest {
                                                         NSLocalizedRecoverySuggestionErrorKey: @"Have you specified the 'drm' prop?"
                                                         }
                              ];
-    return [self finishLoadingWithError:licenseError errCode:@"ERR_DRM_SCHEME"];
+    return [self finishLoadingWithError:licenseError errCode:@"ERR_DRM_SCHEME" contentId:contentId];
   }
   
   
@@ -1885,6 +1886,23 @@ didCancelLoadingRequest:(AVAssetResourceLoadingRequest *)loadingRequest {
   }
   return nil;
 }
+
+- (NSString*)contentIdForLoadingRequest:(AVAssetResourceLoadingRequest*)loadingRequest {
+    NSURL *url = loadingRequest.request.URL;
+    NSString *urlString = url.absoluteString;
+    NSString *contentId = [urlString stringByReplacingOccurrencesOfString:@"skd://" withString:@""];
+    return contentId;
+}
+
+- (AVAssetResourceLoadingRequest*)loadingRequestWithContentId:(NSString*)contentId {
+    for (AVAssetResourceLoadingRequest *lr in _loadingRequests) {
+        if ([[self contentIdForLoadingRequest:lr] isEqualToString:contentId]) {
+            return lr;
+        }
+    }
+    return nil;
+}
+
 #pragma mark - Picture in Picture
 
 #if TARGET_OS_IOS
