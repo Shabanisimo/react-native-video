@@ -171,7 +171,7 @@ class ReactExoplayerView extends FrameLayout implements
                     if (player != null
                             && player.getPlaybackState() == Player.STATE_READY
                             && player.getPlayWhenReady()
-                            ) {
+                    ) {
                         long pos = player.getCurrentPosition();
                         long bufferedDuration = player.getBufferedPercentage() * player.getDuration() / 100;
                         eventEmitter.progressChanged(pos, bufferedDuration, player.getDuration());
@@ -382,7 +382,7 @@ class ReactExoplayerView extends FrameLayout implements
                             int errorStringId = Util.SDK_INT < 18 ? R.string.error_drm_not_supported
                                     : (e.reason == UnsupportedDrmException.REASON_UNSUPPORTED_SCHEME
                                     ? R.string.error_drm_unsupported_scheme : R.string.error_drm_unknown);
-                            eventEmitter.error(getResources().getString(errorStringId), e, getResources().getString(R.string.err_code_drm_scheme));
+                            eventEmitter.error(getResources().getString(errorStringId), e, "error_player_buildDrmSessionManager");
                             return;
                         }
                     }
@@ -751,7 +751,7 @@ class ReactExoplayerView extends FrameLayout implements
             audioTrack.putString("type", format.sampleMimeType);
             audioTrack.putString("language", format.language != null ? format.language : "");
             audioTrack.putString("bitrate", format.bitrate == Format.NO_VALUE ? ""
-                                    : String.format(Locale.US, "%.2fMbps", format.bitrate / 1000000f));
+                    : String.format(Locale.US, "%.2fMbps", format.bitrate / 1000000f));
             audioTracks.pushMap(audioTrack);
         }
         return audioTracks;
@@ -795,13 +795,13 @@ class ReactExoplayerView extends FrameLayout implements
 
         TrackGroupArray groups = info.getTrackGroups(index);
         for (int i = 0; i < groups.length; ++i) {
-             Format format = groups.get(i).getFormat(0);
-             WritableMap textTrack = Arguments.createMap();
-             textTrack.putInt("index", i);
-             textTrack.putString("title", format.id != null ? format.id : "");
-             textTrack.putString("type", format.sampleMimeType);
-             textTrack.putString("language", format.language != null ? format.language : "");
-             textTracks.pushMap(textTrack);
+            Format format = groups.get(i).getFormat(0);
+            WritableMap textTrack = Arguments.createMap();
+            textTrack.putInt("index", i);
+            textTrack.putString("title", format.id != null ? format.id : "");
+            textTrack.putString("type", format.sampleMimeType);
+            textTrack.putString("language", format.language != null ? format.language : "");
+            textTracks.pushMap(textTrack);
         }
         return textTracks;
     }
@@ -868,17 +868,17 @@ class ReactExoplayerView extends FrameLayout implements
 
     @Override
     public void onPlayerError(ExoPlaybackException e) {
-        String errorString = getResources().getString(R.string.error_general);
-        String errCode = getResources().getString(R.string.err_code_player);
+        String errorString = "Something went wrong";
+        String errCode = "error_player";
         Exception ex = e;
         if (e.type == ExoPlaybackException.TYPE_RENDERER) {
             Exception cause = e.getRendererException();
             if (cause instanceof DrmSession.DrmSessionException) {
-                errorString = getResources().getString(R.string.error_drm_license);
-                errCode = getResources().getString(R.string.err_code_drm_license);
+                errorString = "Unable to get DRM license";
+                errCode = "error_player_license";
             } else if (cause instanceof IllegalStateException) {
                 errorString = getResources().getString(R.string.error_drm_unsupported_scheme);
-                errCode = getResources().getString(R.string.err_code_drm_scheme);
+                errCode = "error_player_unsupportedDrmScheme";
             }
             else if (cause instanceof MediaCodecRenderer.DecoderInitializationException) {
                 // Special case for decoder initialization failures.
@@ -898,11 +898,13 @@ class ReactExoplayerView extends FrameLayout implements
                     errorString = getResources().getString(R.string.error_instantiating_decoder,
                             decoderInitializationException.decoderName);
                 }
+                errCode = "error_player_codec";
             }
         }
         else if (e.type == ExoPlaybackException.TYPE_SOURCE) {
             ex = e.getSourceException();
             errorString = getResources().getString(R.string.unrecognized_media_format);
+            errCode = "error_player_unrecognizedMediaFormat";
         }
 
         eventEmitter.error(errorString, ex, errCode);
@@ -1288,7 +1290,7 @@ class ReactExoplayerView extends FrameLayout implements
     @Override
     public void onDrmSessionManagerError(Exception e) {
         Log.d("DRM Info", "onDrmSessionManagerError");
-        eventEmitter.error("onDrmSessionManagerError", e, getResources().getString(R.string.err_code_drm_license));
+        eventEmitter.error("onDrmSessionManagerError", e, "error_player_drmSessionManager");
     }
 
     @Override

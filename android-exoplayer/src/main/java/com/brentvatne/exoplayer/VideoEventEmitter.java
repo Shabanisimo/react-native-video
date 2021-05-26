@@ -119,14 +119,14 @@ class VideoEventEmitter {
     private static final String EVENT_PROP_IS_BUFFERING = "isBuffering";
     private static final String EVENT_PROP_PLAYBACK_RATE = "playbackRate";
 
+    private static final String EVENT_CODE = "code";
     private static final String EVENT_PROP_ERROR = "error";
     private static final String EVENT_PROP_ERROR_STRING = "errorString";
     private static final String EVENT_PROP_ERROR_EXCEPTION = "errorException";
-    private static final String EVENT_PROP_ERROR_CODE = "err_code";
 
     private static final String EVENT_PROP_TIMED_METADATA = "metadata";
 
-    private static final String EVENT_PROP_BITRATE = "bitrate";   
+    private static final String EVENT_PROP_BITRATE = "bitrate";
 
 
     void setViewId(int viewId) {
@@ -181,7 +181,7 @@ class VideoEventEmitter {
         WritableMap event = Arguments.createMap();
         event.putDouble(EVENT_PROP_BITRATE, bitRateEstimate);
         receiveEvent(EVENT_BANDWIDTH, event);
-    }    
+    }
 
     void seek(long currentPosition, long seekTime) {
         WritableMap event = Arguments.createMap();
@@ -228,9 +228,9 @@ class VideoEventEmitter {
         WritableMap error = Arguments.createMap();
         error.putString(EVENT_PROP_ERROR_STRING, errorString);
         error.putString(EVENT_PROP_ERROR_EXCEPTION, exception.getMessage());
-        error.putString(EVENT_PROP_ERROR_CODE, errCode);
         WritableMap event = Arguments.createMap();
         event.putMap(EVENT_PROP_ERROR, error);
+        event.putString(EVENT_CODE, errCode);
         receiveEvent(EVENT_ERROR, event);
     }
 
