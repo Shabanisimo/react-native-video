@@ -357,8 +357,7 @@ class ReactExoplayerView extends FrameLayout implements
             @Override
             public void run() {
                 if (player == null) {
-                    TrackSelection.Factory videoTrackSelectionFactory = new AdaptiveTrackSelection.Factory();
-                    trackSelector = new DefaultTrackSelector(videoTrackSelectionFactory);
+                    trackSelector = new DefaultTrackSelector(getContext());
                     trackSelector.setParameters(trackSelector.buildUponParameters()
                             .setMaxVideoBitrate(maxBitRate == 0 ? Integer.MAX_VALUE : maxBitRate));
 
@@ -454,27 +453,30 @@ class ReactExoplayerView extends FrameLayout implements
         int type = Util.inferContentType(!TextUtils.isEmpty(overrideExtension) ? "." + overrideExtension
                 : uri.getLastPathSegment());
         switch (type) {
-            case C.TYPE_SS:
+            case C.CONTENT_TYPE_SS:
+                assert drmProvider != null;
                 return new SsMediaSource.Factory(
                         new DefaultSsChunkSource.Factory(mediaDataSourceFactory),
                         buildDataSourceFactory(false)
                 ).setLoadErrorHandlingPolicy(
                         config.buildLoadErrorHandlingPolicy(minLoadRetryCount)
                 ).createMediaSource(uri);
-            case C.TYPE_DASH:
+            case  C.CONTENT_TYPE_DASH:
+                assert drmProvider != null;
                 return new DashMediaSource.Factory(
                         new DefaultDashChunkSource.Factory(mediaDataSourceFactory),
                         buildDataSourceFactory(false)
                 ).setLoadErrorHandlingPolicy(
                         config.buildLoadErrorHandlingPolicy(minLoadRetryCount)
                 ).createMediaSource(uri);
-            case C.TYPE_HLS:
+            case C.CONTENT_TYPE_HLS:
+                assert drmProvider != null;
                 return new HlsMediaSource.Factory(
                         mediaDataSourceFactory
                 ).setLoadErrorHandlingPolicy(
                         config.buildLoadErrorHandlingPolicy(minLoadRetryCount)
                 ).createMediaSource(uri);
-            case C.TYPE_OTHER:
+            case C.CONTENT_TYPE_OTHER:
                 return new ProgressiveMediaSource.Factory(
                         mediaDataSourceFactory
                 ).setLoadErrorHandlingPolicy(
@@ -856,10 +858,10 @@ class ReactExoplayerView extends FrameLayout implements
         // Do nothing.
     }
 
-    @Override
-    public void onTracksChanged(TrackGroupArray trackGroups, TrackSelectionArray trackSelections) {
-        // Do Nothing.
-    }
+//    @Override
+//    public void onTracksChanged(TrackGroupArray trackGroups, TrackSelectionArray trackSelections) {
+//        // Do Nothing.
+//    }
 
     @Override
     public void onPlaybackParametersChanged(PlaybackParameters params) {

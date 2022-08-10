@@ -4,7 +4,6 @@ import android.annotation.TargetApi;
 import android.content.Context;
 import androidx.core.content.ContextCompat;
 import android.util.AttributeSet;
-import android.util.Log;
 import android.view.Gravity;
 import android.view.SurfaceView;
 import android.view.TextureView;
@@ -204,10 +203,10 @@ public final class ExoPlayerView extends FrameLayout {
 
         // TextRenderer.Output implementation
 
-        @Override
-        public void onCues(List<Cue> cues) {
-            subtitleLayout.onCues(cues);
-        }
+        // @Override
+        // public void onCues(List<Cue> cues) {
+        //     subtitleLayout.onCues(cues);
+        // }
 
         // SimpleExoPlayer.VideoListener implementation
 
@@ -254,10 +253,10 @@ public final class ExoPlayerView extends FrameLayout {
             // Do nothing.
         }
 
-        @Override
-        public void onTracksChanged(TrackGroupArray trackGroups, TrackSelectionArray trackSelections) {
-            updateForCurrentTrackSelections();
-        }
+        // @Override
+        // public void onTracksChanged(TrackGroupArray trackGroups, TrackSelectionArray trackSelections) {
+        //     updateForCurrentTrackSelections();
+        // }
 
         @Override
         public void onPlaybackParametersChanged(PlaybackParameters params) {
